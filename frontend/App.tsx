@@ -1,39 +1,52 @@
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
-// Internal Components
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+
+// Layout Components
 import { Header } from "@/components/Header";
-import { WalletDetails } from "@/components/WalletDetails";
-import { NetworkInfo } from "@/components/NetworkInfo";
-import { AccountInfo } from "@/components/AccountInfo";
-import { TransferAPT } from "@/components/TransferAPT";
-import { MessageBoard } from "@/components/MessageBoard";
 import { TopBanner } from "@/components/TopBanner";
+
+// Page Components
+import { Marketplace } from "@/pages/Marketplace";
+import { MyLicenses } from "@/pages/MyLicenses";
+import { GameDetail } from "@/pages/GameDetail";
+import { Launcher } from "@/pages/Launcher";
 
 function App() {
   const { connected } = useWallet();
 
   return (
-    <>
-      <TopBanner />
-      <Header />
-      <div className="flex items-center justify-center flex-col">
-        {connected ? (
-          <Card>
-            <CardContent className="flex flex-col gap-10 pt-6">
-              <WalletDetails />
-              <NetworkInfo />
-              <AccountInfo />
-              <TransferAPT />
-              <MessageBoard />
-            </CardContent>
-          </Card>
-        ) : (
-          <CardHeader>
-            <CardTitle>To get started Connect a wallet</CardTitle>
-          </CardHeader>
-        )}
+    <Router>
+      <div className="min-h-screen bg-background">
+        {/* <TopBanner /> */}
+        <Header />
+        
+        <main className="container mx-auto px-4 py-8">
+          <Routes>
+            Public Routes
+            <Route path="/" element={<Marketplace />} />
+            <Route path="/game/:gameId" element={<GameDetail />} />
+            
+            {/* Protected Routes - Require Wallet Connection */}
+            <Route 
+              path="/my-licenses" 
+              element={connected ? <MyLicenses /> : <Navigate to="/" />} 
+            />
+            <Route 
+              path="/launcher" 
+              element={connected ? <Launcher /> : <Navigate to="/" />} 
+            />
+            
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </main>
+        
+        {/* Optional Footer */}
+        <footer className="border-t mt-auto py-6 text-center text-sm text-muted-foreground">
+          <p>Aegis DRM + Arcadia Marketplace - Powered by Aptos</p>
+        </footer>
       </div>
-    </>
+    </Router>
   );
 }
 

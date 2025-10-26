@@ -1,13 +1,20 @@
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Calendar, Shield, Clock, Star } from "lucide-react";
+import { ArrowLeft, Calendar, Shield, Clock, Star, Loader2 } from "lucide-react";
 
 // Import your game data
 import { mockGames } from "@/data/mockGames";
+
+// Initialize Aptos client
+const config = new AptosConfig({ network: Network.DEVNET });
+const aptos = new Aptos(config);
+
+const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS || "0xc5d8f29f688c22ced2b33ba05d7d5241a21ece238ad1657e922251995b059ebc";
 
 const formatPrice = (price: number) => {
   return price === 0 ? "Free" : `${price} APT`;
@@ -24,11 +31,144 @@ const formatDuration = (seconds: number) => {
 export function GameDetail() {
   const { gameId } = useParams();
   const navigate = useNavigate();
-  const { connected } = useWallet();
+
+  const wallet = useWallet();
+  const { connected, account } = wallet;
+
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [isOwned, setIsOwned] = useState(false);
+  const [checkingOwnership, setCheckingOwnership] = useState(false);
 
   // Find the game
   const game = mockGames.find(g => g.id === gameId);
+
+  // Check ownership when component mounts or wallet connects
+  useEffect(() => {
+    if (connected && account && game) {
+      checkGameOwnership();
+    }
+  }, [connected, account, game]);
+
+  const checkGameOwnership = async () => {
+    if (!account || !game) return;
+
+    try {
+      setCheckingOwnership(true);
+      const gameIdBytes = Array.from(new TextEncoder().encode(game.id));
+      
+      const response = await aptos.view({
+        payload: {
+          function: `${MODULE_ADDRESS}::license::has_game_license`,
+          typeArguments: [],
+          functionArguments: [account.address, gameIdBytes],
+        },
+      });
+
+      setIsOwned(response[0] as boolean);
+    } catch (error) {
+      console.error('Error checking ownership:', error);
+      setIsOwned(false);
+    } finally {
+      setCheckingOwnership(false);
+    }
+  };
+
+  const handlePurchase = async () => {
+    console.log('=== Purchase Debug Info ===');
+    console.log('Connected:', connected);
+    console.log('Account:', account);
+    console.log('Wallet:', wallet);
+    console.log('Wallet name:', wallet.wallet?.name);
+    console.log('signAndSubmitTransaction exists:', !!wallet.signAndSubmitTransaction);
+
+    if (!connected) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    if (!account) {
+      alert('No account found. Please reconnect your wallet.');
+      return;
+    }
+
+    if (!game) {
+      alert('Game not found');
+      return;
+    }
+
+    // Check if wallet supports transactions
+    if (typeof wallet.signAndSubmitTransaction !== 'function') {
+      alert('Your wallet does not support transactions. Please try reconnecting or use a different wallet (like Petra).');
+      return;
+    }
+
+    setIsPurchasing(true);
+
+    try {
+      const gameIdBytes = Array.from(new TextEncoder().encode(game.id));
+      
+      const metadata = JSON.stringify({
+        name: game.title,
+        image: game.coverImage,
+        description: game.shortDescription,
+        developer: game.developer,
+        genre: game.genre
+      });
+      const metadataBytes = Array.from(new TextEncoder().encode(metadata));
+
+      const payload = {
+        function: `${MODULE_ADDRESS}::license::buy_game_license`,
+        typeArguments: [],
+        functionArguments: [
+          gameIdBytes,
+          0,
+          game.transferable,
+          metadataBytes
+        ]
+      };
+
+      console.log('Payload:', payload);
+
+      const response = await wallet.signAndSubmitTransaction({
+        sender: account.address,
+        data: payload
+      });
+
+      console.log('Transaction response:', response);
+
+      const txn = await aptos.waitForTransaction({ 
+        transactionHash: response.hash 
+      });
+
+      console.log('Transaction confirmed:', txn);
+
+      alert(`Successfully purchased ${game.title}!\n\nYou can now find it in your library.`);
+      setIsOwned(true);
+      
+    } catch (error: any) {
+      console.error('=== Purchase Error ===');
+      console.error('Error:', error);
+      console.error('Error message:', error?.message);
+      console.error('Error stack:', error?.stack);
+      
+      let errorMessage = 'Purchase failed. Please try again.';
+      
+      if (error?.message?.includes('WalletCore is not initialized')) {
+        errorMessage = 'Wallet connection issue. Please disconnect and reconnect your wallet, then try again.';
+      } else if (error?.message?.includes('INSUFFICIENT_BALANCE')) {
+        errorMessage = 'Insufficient balance. Please add more APT to your wallet.';
+      } else if (error?.message?.includes('USER_REJECTED')) {
+        errorMessage = 'Transaction cancelled.';
+      } else if (error?.message) {
+        errorMessage = `Error: ${error.message}`;
+      }
+      
+      alert(errorMessage);
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
 
   if (!game) {
     return (
@@ -190,6 +330,14 @@ export function GameDetail() {
         <div className="lg:col-span-1">
           <Card className="sticky top-4">
             <CardContent className="p-6 space-y-6">
+              {/* Ownership Badge */}
+              {isOwned && (
+                <div className="bg-green-100 dark:bg-green-900 border border-green-600 rounded-lg p-4 text-center">
+                  <div className="text-green-700 dark:text-green-300 font-semibold">
+                    ✓ You own this game
+                  </div>
+                </div>
+              )}
               {/* Price */}
               <div>
                 <div className="text-3xl font-bold mb-2">
@@ -212,12 +360,42 @@ export function GameDetail() {
               </div>
 
               {/* Buy Button */}
-              <Button 
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg py-6"
-                disabled={!connected}
-              >
-                {connected ? "Buy License" : "Connect Wallet to Purchase"}
-              </Button>
+              {checkingOwnership ? (
+                <Button className="w-full" disabled>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Checking ownership...
+                </Button>
+              ) : isOwned ? (
+                <Button 
+                  className="w-full bg-green-600 hover:bg-green-700 text-lg py-6"
+                  onClick={() => navigate("/launcher")}
+                >
+                  Play Now
+                </Button>
+              ) : (
+                <Button 
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg py-6"
+                  disabled={!connected || isPurchasing}
+                  onClick={handlePurchase}
+                >
+                  {isPurchasing ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Purchasing...
+                    </>
+                  ) : connected ? (
+                    `Buy for ${formatPrice(game.price)}`
+                  ) : (
+                    "Connect Wallet to Purchase"
+                  )}
+                </Button>
+              )}
+
+              {!connected && (
+                <p className="text-xs text-center text-muted-foreground">
+                  Connect your wallet to purchase this game
+                </p>
+              )}
 
               {/* License Info */}
               <div className="space-y-4 pt-4 border-t">

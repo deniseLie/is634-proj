@@ -13,7 +13,7 @@ import {
   useWallet,
 } from "@aptos-labs/wallet-adapter-react";
 import { ArrowLeft, ArrowRight, ChevronDown, Copy, LogOut, User } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 // Internal components
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -25,13 +25,68 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
+import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
+import { Wallet } from "lucide-react";
+
+// Initialize Aptos client
+const config = new AptosConfig({ network: Network.DEVNET });
+const aptos = new Aptos(config);
 
 export function WalletSelector() {
   const { account, connected, disconnect, wallet } = useWallet();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [balance, setBalance] = useState<string>("0");
+  const [loadingBalance, setLoadingBalance] = useState(false);
 
   const closeDialog = useCallback(() => setIsDialogOpen(false), []);
+
+  // Fetch balance when connected
+  useEffect(() => {
+    if (connected && account) {
+      fetchBalance();
+    } else {
+      setBalance("0");
+    }
+  }, [connected, account]);
+
+  const fetchBalance = async () => {
+    if (!account) return;
+
+    try {
+      setLoadingBalance(true);
+      
+      // Convert address to string properly
+      const addressString = account.address.toString();
+      console.log('Fetching balance for address:', addressString);
+      
+      const resources = await aptos.getAccountResources({
+        accountAddress: addressString
+      });
+
+      console.log('Resources found:', resources.length);
+
+      const coinResource = resources.find(
+        (r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
+      );
+
+      if (coinResource) {
+        const coinData = coinResource.data as { coin: { value: string } };
+        const balanceInOctas = parseInt(coinData.coin.value);
+        const balanceInAPT = (balanceInOctas / 100000000).toFixed(4);
+        console.log('Balance:', balanceInAPT, 'APT');
+        setBalance(balanceInAPT);
+      } else {
+        console.log('No coin resource found');
+        setBalance("0");
+      }
+    } catch (error) {
+      console.error("Error fetching balance:", error);
+      setBalance("0");
+    } finally {
+      setLoadingBalance(false);
+    }
+  };
 
   const copyAddress = useCallback(async () => {
     if (!account?.address.toStringLong()) return;
@@ -55,7 +110,22 @@ export function WalletSelector() {
       <DropdownMenuTrigger asChild>
         <Button>{account?.ansName || truncateAddress(account?.address.toStringLong()) || "Unknown"}</Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" className="w-56">
+        {/* Balance Display */}
+        <div className="px-2 py-3 border-b">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Balance</span>
+            {loadingBalance ? (
+              <span className="text-sm">Loading...</span>
+            ) : (
+              <div className="flex items-center gap-1">
+                <Wallet className="h-3 w-3" />
+                <span className="font-mono font-semibold">{balance} APT</span>
+              </div>
+            )}
+          </div>
+        </div>
+
         <DropdownMenuItem onSelect={copyAddress} className="gap-2">
           <Copy className="h-4 w-4" /> Copy address
         </DropdownMenuItem>

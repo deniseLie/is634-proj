@@ -1,4 +1,4 @@
-# 🎮 Aegis - Blockchain Game Marketplace
+# 🎮 Arcadia - Blockchain Game Marketplace
 
 A decentralized game marketplace built on Aptos blockchain where users can purchase, own, and trade game licenses using cryptocurrency. True digital ownership powered by blockchain technology.
 

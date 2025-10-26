@@ -39,6 +39,8 @@ export function GameDetail() {
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isOwned, setIsOwned] = useState(false);
   const [checkingOwnership, setCheckingOwnership] = useState(false);
+  const [balance, setBalance] = useState<number>(0);
+  const [checkingBalance, setCheckingBalance] = useState(false);
 
   // Find the game
   const game = mockGames.find(g => g.id === gameId);
@@ -47,6 +49,7 @@ export function GameDetail() {
   useEffect(() => {
     if (connected && account && game) {
       checkGameOwnership();
+      fetchBalance();
     }
   }, [connected, account, game]);
 
@@ -71,6 +74,27 @@ export function GameDetail() {
       setIsOwned(false);
     } finally {
       setCheckingOwnership(false);
+    }
+  };
+
+  const fetchBalance = async () => {
+    if (!account) return;
+
+    try {
+      setCheckingBalance(true);
+      const addressString = account.address.toString();
+      
+      const balanceInOctas = await aptos.getAccountAPTAmount({
+        accountAddress: addressString
+      });
+      
+      const balanceInAPT = balanceInOctas / 100000000;
+      setBalance(balanceInAPT);
+    } catch (error) {
+      console.error('Error fetching balance:', error);
+      setBalance(0);
+    } finally {
+      setCheckingBalance(false);
     }
   };
 
@@ -100,6 +124,18 @@ export function GameDetail() {
     // Check if wallet supports transactions
     if (typeof wallet.signAndSubmitTransaction !== 'function') {
       alert('Your wallet does not support transactions. Please try reconnecting or use a different wallet (like Petra).');
+      return;
+    }
+
+    // CHECK BALANCE FIRST
+    if (game.price > balance) {
+      alert(
+        `Insufficient Balance\n\n` +
+        `Game Price: ${game.price} APT\n` +
+        `Your Balance: ${balance.toFixed(4)} APT\n` +
+        `You need ${(game.price - balance).toFixed(4)} more APT\n\n` +
+        `Get more APT from the faucet: https://aptos.dev/en/network/faucet`
+      );
       return;
     }
 

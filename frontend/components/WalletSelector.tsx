@@ -12,6 +12,7 @@ import {
   truncateAddress,
   useWallet,
 } from "@aptos-labs/wallet-adapter-react";
+import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 import { ArrowLeft, ArrowRight, ChevronDown, Copy, LogOut, User } from "lucide-react";
 import { useCallback, useState, useEffect } from "react";
 // Internal components
@@ -25,7 +26,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
-import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 import { Wallet } from "lucide-react";
 
 // Initialize Aptos client
@@ -51,37 +51,39 @@ export function WalletSelector() {
   }, [connected, account]);
 
   const fetchBalance = async () => {
-    if (!account) return;
+    console.log('=== Fetching Balance ===');
+    
+    if (!account) {
+      console.log('No account found');
+      return;
+    }
 
     try {
       setLoadingBalance(true);
       
-      // Convert address to string properly
       const addressString = account.address.toString();
-      console.log('Fetching balance for address:', addressString);
+      console.log('Checking balance for:', addressString);
+      console.log('Network:', config.network);
       
-      const resources = await aptos.getAccountResources({
+      // Use the getAccountAPTAmount method
+      const balance = await aptos.getAccountAPTAmount({
         accountAddress: addressString
       });
-
-      console.log('Resources found:', resources.length);
-
-      const coinResource = resources.find(
-        (r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
-      );
-
-      if (coinResource) {
-        const coinData = coinResource.data as { coin: { value: string } };
-        const balanceInOctas = parseInt(coinData.coin.value);
-        const balanceInAPT = (balanceInOctas / 100000000).toFixed(4);
-        console.log('Balance:', balanceInAPT, 'APT');
-        setBalance(balanceInAPT);
-      } else {
-        console.log('No coin resource found');
-        setBalance("0");
-      }
+      
+      console.log('Balance (Octas):', balance);
+      
+      // Convert to APT (1 APT = 100,000,000 Octas)
+      const balanceInAPT = (balance / 100000000).toFixed(4);
+      
+      console.log('Balance (APT):', balanceInAPT);
+      
+      setBalance(balanceInAPT);
+      console.log('✅ Balance fetched successfully!');
+      
     } catch (error) {
-      console.error("Error fetching balance:", error);
+      console.error('Error fetching balance:', error);
+      const errMsg = error instanceof Error ? error.message : String(error);
+      console.error('Error message:', errMsg);
       setBalance("0");
     } finally {
       setLoadingBalance(false);
@@ -113,7 +115,7 @@ export function WalletSelector() {
       <DropdownMenuContent align="end" className="w-56">
         {/* Balance Display */}
         <div className="px-2 py-3 border-b">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted-foreground">Balance</span>
             {loadingBalance ? (
               <span className="text-sm">Loading...</span>
@@ -123,6 +125,17 @@ export function WalletSelector() {
                 <span className="font-mono font-semibold">{balance} APT</span>
               </div>
             )}
+          </div>
+          
+          {/* Network Display */}
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Network:</span>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span className="font-semibold text-green-600 dark:text-green-400">
+                Devnet
+              </span>
+            </div>
           </div>
         </div>
 

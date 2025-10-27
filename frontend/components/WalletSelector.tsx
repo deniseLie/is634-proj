@@ -12,8 +12,9 @@ import {
   truncateAddress,
   useWallet,
 } from "@aptos-labs/wallet-adapter-react";
+import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 import { ArrowLeft, ArrowRight, ChevronDown, Copy, LogOut, User } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 // Internal components
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -25,13 +26,69 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
+import { Wallet } from "lucide-react";
+
+// Initialize Aptos client
+const config = new AptosConfig({ network: Network.DEVNET });
+const aptos = new Aptos(config);
 
 export function WalletSelector() {
   const { account, connected, disconnect, wallet } = useWallet();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [balance, setBalance] = useState<string>("0");
+  const [loadingBalance, setLoadingBalance] = useState(false);
 
   const closeDialog = useCallback(() => setIsDialogOpen(false), []);
+
+  // Fetch balance when connected
+  useEffect(() => {
+    if (connected && account) {
+      fetchBalance();
+    } else {
+      setBalance("0");
+    }
+  }, [connected, account]);
+
+  const fetchBalance = async () => {
+    console.log('=== Fetching Balance ===');
+    
+    if (!account) {
+      console.log('No account found');
+      return;
+    }
+
+    try {
+      setLoadingBalance(true);
+      
+      const addressString = account.address.toString();
+      console.log('Checking balance for:', addressString);
+      console.log('Network:', config.network);
+      
+      // Use the getAccountAPTAmount method
+      const balance = await aptos.getAccountAPTAmount({
+        accountAddress: addressString
+      });
+      
+      console.log('Balance (Octas):', balance);
+      
+      // Convert to APT (1 APT = 100,000,000 Octas)
+      const balanceInAPT = (balance / 100000000).toFixed(4);
+      
+      console.log('Balance (APT):', balanceInAPT);
+      
+      setBalance(balanceInAPT);
+      console.log('✅ Balance fetched successfully!');
+      
+    } catch (error) {
+      console.error('Error fetching balance:', error);
+      const errMsg = error instanceof Error ? error.message : String(error);
+      console.error('Error message:', errMsg);
+      setBalance("0");
+    } finally {
+      setLoadingBalance(false);
+    }
+  };
 
   const copyAddress = useCallback(async () => {
     if (!account?.address.toStringLong()) return;
@@ -55,7 +112,33 @@ export function WalletSelector() {
       <DropdownMenuTrigger asChild>
         <Button>{account?.ansName || truncateAddress(account?.address.toStringLong()) || "Unknown"}</Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" className="w-56">
+        {/* Balance Display */}
+        <div className="px-2 py-3 border-b">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-muted-foreground">Balance</span>
+            {loadingBalance ? (
+              <span className="text-sm">Loading...</span>
+            ) : (
+              <div className="flex items-center gap-1">
+                <Wallet className="h-3 w-3" />
+                <span className="font-mono font-semibold">{balance} APT</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Network Display */}
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Network:</span>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span className="font-semibold text-green-600 dark:text-green-400">
+                Devnet
+              </span>
+            </div>
+          </div>
+        </div>
+
         <DropdownMenuItem onSelect={copyAddress} className="gap-2">
           <Copy className="h-4 w-4" /> Copy address
         </DropdownMenuItem>

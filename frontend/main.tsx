@@ -11,16 +11,20 @@ import { Toaster } from "@/components/ui/toaster.tsx";
 import { WalletProvider } from "@/components/WalletProvider.tsx";
 import { WrongNetworkAlert } from "@/components/WrongNetworkAlert";
 
+import { UserProvider } from "./context/UserContext";
+
 const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <WalletProvider>
-      <QueryClientProvider client={queryClient}>
-        <App />
-        <WrongNetworkAlert />
-        <Toaster />
-      </QueryClientProvider>
-    </WalletProvider>
+    <UserProvider>
+      <WalletProvider>
+        <QueryClientProvider client={queryClient}>
+          <App />
+          <WrongNetworkAlert />
+          <Toaster />
+        </QueryClientProvider>
+      </WalletProvider>
+    </UserProvider>
   </React.StrictMode>,
 );

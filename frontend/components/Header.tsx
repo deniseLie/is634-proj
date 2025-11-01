@@ -1,12 +1,15 @@
 // components/Header.tsx
+import { useContext } from "react";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { Link, useLocation } from "react-router-dom";
 import { WalletSelector } from "./WalletSelector";
 import { Button } from "./ui/button";
+import { UserContext } from "@/context/UserContext";
 
 export function Header() {
   const { connected } = useWallet();
   const location = useLocation();
+  const { user } = useContext(UserContext);
 
   return (
     <header className="border-b">
@@ -43,9 +46,19 @@ export function Header() {
                   Launcher
                 </Button>
               </Link>
+
+              {user && user.role === "developer" && (
+                <Link to="/dev-dashboard">
+                  <Button 
+                    variant={location.pathname === "/dev-dashboard" ? "default" : "ghost"}
+                  >
+                    Developer
+                  </Button>
+                </Link>
+              )}
             </>
           )}
-          
+
           {/* Wallet Connect */}
           <WalletSelector />
         </nav>

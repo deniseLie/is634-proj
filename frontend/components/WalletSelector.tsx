@@ -14,7 +14,7 @@ import {
 } from "@aptos-labs/wallet-adapter-react";
 import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 import { ArrowLeft, ArrowRight, ChevronDown, Copy, LogOut, User } from "lucide-react";
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useContext } from "react";
 // Internal components
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
 import { Wallet } from "lucide-react";
+import { UserContext } from "@/context/UserContext";
 
 // Initialize Aptos client
 const config = new AptosConfig({ network: Network.DEVNET });
@@ -40,6 +41,8 @@ export function WalletSelector() {
   const [loadingBalance, setLoadingBalance] = useState(false);
 
   const closeDialog = useCallback(() => setIsDialogOpen(false), []);
+
+  const { user, setUser } = useContext(UserContext);
 
   // Fetch balance when connected
   useEffect(() => {
@@ -139,6 +142,26 @@ export function WalletSelector() {
           </div>
         </div>
 
+        {/* --- User Role Section --- */}
+        <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+          Role
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
+          onSelect={() => setUser({ ...user, role: "player" })}
+          className={`gap-2 ${user?.role === "player" ? "bg-secondary" : ""}`}
+        >
+          Player {user?.role === "player" && "✓"}
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
+          onSelect={() => setUser({ ...user, role: "developer" })}
+          className={`gap-2 ${user?.role === "developer" ? "bg-secondary" : ""}`}
+        >
+          Developer {user?.role === "developer" && "✓"}
+        </DropdownMenuItem>
+
+        {/* ------------------------- */}
         <DropdownMenuItem onSelect={copyAddress} className="gap-2">
           <Copy className="h-4 w-4" /> Copy address
         </DropdownMenuItem>

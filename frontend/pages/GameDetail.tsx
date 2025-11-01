@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { useState, useEffect } from "react";
 import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
@@ -16,6 +16,7 @@ const aptos = new Aptos(config);
 
 const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS || "0xc5d8f29f688c22ced2b33ba05d7d5241a21ece238ad1657e922251995b059ebc";
 
+// --- Helper Functions ---
 const formatPrice = (price: number) => {
   return price === 0 ? "Free" : `${price} APT`;
 };
@@ -31,6 +32,7 @@ const formatDuration = (seconds: number) => {
 export function GameDetail() {
   const { gameId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const wallet = useWallet();
   const { connected, account } = wallet;
@@ -41,9 +43,10 @@ export function GameDetail() {
   const [checkingOwnership, setCheckingOwnership] = useState(false);
   const [balance, setBalance] = useState<number>(0);
   const [checkingBalance, setCheckingBalance] = useState(false);
+  
 
-  // Find the game
-  const game = mockGames.find(g => g.id === gameId);
+  // Get game from location state, or fall back to mockGames
+  const game = location.state?.game || mockGames.find(g => g.id === gameId);
 
   // Check ownership when component mounts or wallet connects
   useEffect(() => {
@@ -98,6 +101,7 @@ export function GameDetail() {
     }
   };
 
+  // PURCHASE GAME
   const handlePurchase = async () => {
     console.log('=== Purchase Debug Info ===');
     console.log('Connected:', connected);
@@ -153,17 +157,25 @@ export function GameDetail() {
       });
       const metadataBytes = Array.from(new TextEncoder().encode(metadata));
 
+      // const payload = {
+      //   function: `${MODULE_ADDRESS}::license::buy_game_license`,
+      //   typeArguments: [],
+      //   functionArguments: [
+      //     gameIdBytes,
+      //     0,
+      //     game.transferable,
+      //     metadataBytes
+      //   ]
+      // };
+
       const payload = {
-        function: `${MODULE_ADDRESS}::license::buy_game_license`,
+        function: `${MODULE_ADDRESS}::license::buy_game_from_registry`,
         typeArguments: [],
         functionArguments: [
+          game.seller,
           gameIdBytes,
-          0,
-          game.transferable,
-          metadataBytes
         ]
       };
-
       console.log('Payload:', payload);
 
       const response = await wallet.signAndSubmitTransaction({

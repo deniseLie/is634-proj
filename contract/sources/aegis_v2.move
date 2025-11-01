@@ -36,7 +36,8 @@ module aegis_addr::license {
     // Game registry to store game prices
     struct GameRegistry has key {
         games: Table<vector<u8>, GameInfo>,
-        dev_games: Table<address, vector<vector<u8>>>  // maps developer → list of game_ids
+        dev_games: Table<address, vector<vector<u8>>>,  // maps developer → list of game_ids
+        all_game_ids: vector<vector<u8>>,
     }
 
     struct GameInfo has store, drop, copy {
@@ -78,9 +79,15 @@ module aegis_addr::license {
 
     // Initialize game registry (called once by admin)
     public entry fun initialize_registry(admin: &signer) {
+
+        if (exists<GameRegistry>(@aegis_addr)) {
+            return;
+        };
+
         let registry = GameRegistry {
             games: table::new(),
-            dev_games: table::new()
+            dev_games: table::new(),
+            all_game_ids: vector::empty<vector<u8>>()
         };
         move_to(admin, registry);
     }
@@ -199,8 +206,12 @@ module aegis_addr::license {
         let game_info = table::borrow(&registry.games, game_id);
         assert!(game_info.active, ENOT_FOUND);
 
+        // Store values we need (important: do this before any mutable borrows)
+        let price = game_info.price;
+        let metadata_uri = game_info.metadata_uri;
+
         // Transfer payment from buyer to seller
-        coin::transfer<AptosCoin>(buyer, seller_addr, game_info.price);
+        coin::transfer<AptosCoin>(buyer, seller_addr, price);
 
         // Get license list
         let license_list = borrow_global_mut<LicenseList>(buyer_address);
@@ -213,12 +224,14 @@ module aegis_addr::license {
             owner: buyer_address,
             expiry: 0,
             transferable: true,
-            metadata_uri: game_info.metadata_uri
+            metadata_uri: metadata_uri
         };
         
+        // Add to table
         table::add(&mut license_list.licenses, counter, new_license);
         license_list.license_counter = counter;
         
+        // Emit event
         event::emit(LicenseCreated {
             license_id: counter,
             game_id,
@@ -277,12 +290,36 @@ module aegis_addr::license {
         false
     }
 
+    // View function to check if registry is initialized
+    #[view]
+    public fun is_registry_initialized(): bool {
+        exists<GameRegistry>(@aegis_addr)
+    }
+
     // View function: Get all available games
     #[view]
-    public fun get_all_games(registry_addr: address): vector<GameInfo> acquires GameRegistry {
-        let registry = borrow_global<GameRegistry>(registry_addr);
-        // Note: This is a simplified version. In production, you'd want pagination
-        vector::empty<GameInfo>()
+    public fun get_all_games(): vector<GameInfo> acquires GameRegistry {
+        // Check if registry exists, if not return empty vector
+        if (!exists<GameRegistry>(@aegis_addr)) {
+            return vector::empty<GameInfo>()
+        };
+
+        let registry = borrow_global<GameRegistry>(@aegis_addr);
+        let all_games = vector::empty<GameInfo>();
+
+        let i = 0;
+        let len = vector::length(&registry.all_game_ids);
+        
+        while (i < len) {
+            let game_id = *vector::borrow(&registry.all_game_ids, i);
+            if (table::contains(&registry.games, game_id)) {
+                let game = table::borrow(&registry.games, game_id);
+                vector::push_back(&mut all_games, *game);
+            };
+            i = i + 1;
+        };
+        
+        all_games
     }
 
     // Transfer license to another user
@@ -363,13 +400,17 @@ module aegis_addr::license {
             active: true
         };
         
-        // Add or update the game record
+        // Add to game table
         table::upsert(&mut registry.games, game_id, game_info);
+        
+        // Add game_id to all_game_ids vector
+        vector::push_back(&mut registry.all_game_ids, game_id);
 
         // Add game_id to developer’s list (dev_games)
         if (!table::contains(&registry.dev_games, publisher_addr)) {
             table::add(&mut registry.dev_games, publisher_addr, vector::empty<vector<u8>>());
         };
+
         let dev_list = table::borrow_mut(&mut registry.dev_games, publisher_addr);
         vector::push_back(dev_list, game_id);
         

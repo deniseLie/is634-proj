@@ -113,21 +113,19 @@ export function Marketplace() {
       const gamesData = response[0];
       
       const parsedGames = gamesData.map((game, index) => {
-        // const gameId = typeof game.game_id === 'string' 
-        //   ? hexToString(game.game_id) 
-        //   : arrayToString(game.game_id);
+        game_id: game.game_id === "" ? "0" : game.game_id,
         
-        // const title = typeof game.title === 'string'
-        //   ? hexToString(game.title)
-        //   : arrayToString(game.title);
+        game.title = typeof game.title === 'string'
+          ? hexToString(game.title)
+          : arrayToString(game.title);
 
-        // const description = typeof game.description === 'string'
-        //   ? hexToString(game.description)
-        //   : arrayToString(game.description);
+        game.description = typeof game.description === 'string'
+          ? hexToString(game.description)
+          : arrayToString(game.description);
 
-        // const metadataUri = typeof game.metadata_uri === 'string'
-        //   ? hexToString(game.metadata_uri)
-        //   : arrayToString(game.metadata_uri);
+        game.metadataUri = typeof game.metadata_uri === 'string'
+          ? hexToString(game.metadata_uri)
+          : arrayToString(game.metadata_uri);
 
         return generateRandomGame(game);
       });

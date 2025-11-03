@@ -29,11 +29,42 @@ function getRandomArray<T>(arr: T[], minLen = 1, maxLen?: number) {
   return Array.from({ length: len }, () => arr[getRandomInt(0, arr.length - 1)]);
 }
 
+export interface Game {
+  id: string;
+  title: string;
+  description: string;
+  shortDescription: string;
+  genre: string[];
+  developer: string;
+  publisher: string;
+  releaseDate: string;
+  price: number; // in APT tokens
+  coverImage: string;
+  screenshots: string[];
+  rating: number; // out of 5
+  reviewCount: number;
+  features: string[];
+  systemRequirements: {
+    os: string;
+    processor: string;
+    memory: string;
+    graphics: string;
+    storage: string;
+  };
+  licenseDuration: number; // in seconds, 0 = perpetual
+  transferable: boolean;
+  tags: string[];
+  videoUrl?: string;
+}
+
 export function generateRandomGame(
-    id: string, title: string, description: string, metadataUri:string, seller: string, price: number
+  game
 ): Game {
+
+  const { game_id, title, description, metadataUri, seller, price } = game;
+
   return {
-    id,
+    id: game_id,
     title,
     description,
     shortDescription: `Short description for ${title}`,

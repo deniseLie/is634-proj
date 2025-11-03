@@ -35,14 +35,13 @@ export function GameDetail() {
   const location = useLocation();
 
   const wallet = useWallet();
-  const { connected, account } = wallet;
+  const { account, connected } = wallet;
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isOwned, setIsOwned] = useState(false);
   const [checkingOwnership, setCheckingOwnership] = useState(false);
   const [balance, setBalance] = useState<number>(0);
-  const [checkingBalance, setCheckingBalance] = useState(false);
   
 
   // Get game from location state, or fall back to mockGames
@@ -67,7 +66,7 @@ export function GameDetail() {
         payload: {
           function: `${MODULE_ADDRESS}::license::has_game_license`,
           typeArguments: [],
-          functionArguments: [account.address, gameIdBytes],
+          functionArguments: [account.address, game.id],
         },
       });
 
@@ -84,7 +83,6 @@ export function GameDetail() {
     if (!account) return;
 
     try {
-      setCheckingBalance(true);
       const addressString = account.address.toString();
       
       const balanceInOctas = await aptos.getAccountAPTAmount({
@@ -96,13 +94,12 @@ export function GameDetail() {
     } catch (error) {
       console.error('Error fetching balance:', error);
       setBalance(0);
-    } finally {
-      setCheckingBalance(false);
     }
   };
 
   // PURCHASE GAME
   const handlePurchase = async () => {
+    console.log('GameDetail game:', game);
     console.log('=== Purchase Debug Info ===');
     console.log('Connected:', connected);
     console.log('Account:', account);
@@ -148,13 +145,14 @@ export function GameDetail() {
     try {
       const gameIdBytes = Array.from(new TextEncoder().encode(game.id));
       
-      const metadata = JSON.stringify({
-        name: game.title,
-        image: game.coverImage,
-        description: game.shortDescription,
-        developer: game.developer,
-        genre: game.genre
-      });
+      // const metadata = JSON.stringify({
+      //   name: game.title,
+      //   image: game.coverImage,
+      //   description: game.shortDescription,
+      //   developer: game.developer,
+      //   genre: game.genre
+      // });
+      const metadata = `Game License for ${game.title}`;
       const metadataBytes = Array.from(new TextEncoder().encode(metadata));
 
       // const payload = {
@@ -167,15 +165,16 @@ export function GameDetail() {
       //     metadataBytes
       //   ]
       // };
-
+      
       const payload = {
         function: `${MODULE_ADDRESS}::license::buy_game_from_registry`,
         typeArguments: [],
         functionArguments: [
-          game.seller,
-          gameIdBytes,
+          // game.seller,  // seller address
+          game.id
         ]
       };
+
       console.log('Payload:', payload);
 
       const response = await wallet.signAndSubmitTransaction({
@@ -310,8 +309,8 @@ export function GameDetail() {
 
               {/* Genre Tags */}
               <div className="flex flex-wrap gap-2">
-                {game.genre.map(genre => (
-                  <Badge key={genre} variant="secondary">
+                {game.genre.map((genre, index) => (
+                  <Badge key={`genre-${index}`} variant="secondary">
                     {genre}
                   </Badge>
                 ))}
@@ -325,7 +324,7 @@ export function GameDetail() {
               <h2 className="text-2xl font-bold">Key Features</h2>
               <ul className="space-y-2">
                 {game.features.map((feature, index) => (
-                  <li key={index} className="flex items-start gap-2">
+                  <li key={`f-${index}`} className="flex items-start gap-2">
                     <span className="text-primary mt-1">✓</span>
                     <span className="text-muted-foreground">{feature}</span>
                   </li>
@@ -498,8 +497,8 @@ export function GameDetail() {
         <CardContent className="p-6">
           <h3 className="font-semibold mb-3">Popular Tags</h3>
           <div className="flex flex-wrap gap-2">
-            {game.tags.map(tag => (
-              <Badge key={tag} variant="outline">
+            {game.tags.map((tag, index) => (
+              <Badge key={index} variant="outline">
                 {tag}
               </Badge>
             ))}

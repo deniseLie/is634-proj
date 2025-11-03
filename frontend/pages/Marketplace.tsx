@@ -19,7 +19,6 @@ const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS || "0xc5d8f29f688c22c
 const formatPrice = (price) => {
   return price === 0 ? "Free" : `${price} APT`;
 };
-
 export function Marketplace() {
   const wallet = useWallet();
   const { connected, account } = wallet;
@@ -114,23 +113,23 @@ export function Marketplace() {
       const gamesData = response[0];
       
       const parsedGames = gamesData.map((game, index) => {
-        const gameId = typeof game.game_id === 'string' 
-          ? hexToString(game.game_id) 
-          : arrayToString(game.game_id);
+        // const gameId = typeof game.game_id === 'string' 
+        //   ? hexToString(game.game_id) 
+        //   : arrayToString(game.game_id);
         
-        const title = typeof game.title === 'string'
-          ? hexToString(game.title)
-          : arrayToString(game.title);
+        // const title = typeof game.title === 'string'
+        //   ? hexToString(game.title)
+        //   : arrayToString(game.title);
 
-        const description = typeof game.description === 'string'
-          ? hexToString(game.description)
-          : arrayToString(game.description);
+        // const description = typeof game.description === 'string'
+        //   ? hexToString(game.description)
+        //   : arrayToString(game.description);
 
-        const metadataUri = typeof game.metadata_uri === 'string'
-          ? hexToString(game.metadata_uri)
-          : arrayToString(game.metadata_uri);
+        // const metadataUri = typeof game.metadata_uri === 'string'
+        //   ? hexToString(game.metadata_uri)
+        //   : arrayToString(game.metadata_uri);
 
-        return generateRandomGame(gameId, title, description, metadataUri, game.seller, game.price);
+        return generateRandomGame(game);
       });
 
       console.log('Parsed games:', parsedGames);

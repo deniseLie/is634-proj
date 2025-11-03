@@ -49,7 +49,6 @@ export function DeveloperDashboard() {
   const [uploading, setUploading] = useState(false);
 
   const [newGame, setNewGame] = useState({
-    id: "",
     price: "",
     title: "",
     description: "",
@@ -131,7 +130,7 @@ export function DeveloperDashboard() {
           handle: tableHandle_devgames, // registry.dev_games handle
           data: {
             key_type: "address", // Key is the developer's address
-            value_type: "vector<vector<u8>>",  // Value is a vector of game IDs
+            value_type: "vector<u64>",  // Value is a vector of game IDs
             key: addressHex,
           }
         });
@@ -151,14 +150,12 @@ export function DeveloperDashboard() {
 
       for (const gameId  of devGames) {
         try {
-          const gameIdHex = HexString.fromUint8Array(new Uint8Array(gameId)).toString();
-          console.log('gameIdHex', gameIdHex);
 
           // Query the games table with the game ID
           const game = await aptos.getTableItem({
             handle: tableHandle_game,
             data: {
-              key_type: "vector<u8>", // Game ID is vector<u8>
+              key_type: "u64", // Game ID is u64
               value_type: `${MODULE_ADDRESS}::license::GameInfo`, // Value is GameInfo struct
               key: gameId, // Use the game ID as key
             }
@@ -166,7 +163,6 @@ export function DeveloperDashboard() {
           console.log('game', game);
 
           myGames.push({
-            id: hexToString(gameId),
             title: hexToString(game.title),
             description: hexToString(game.description),
             metadataUri: hexToString(game.metadata_uri),
@@ -201,9 +197,8 @@ export function DeveloperDashboard() {
         function: `${MODULE_ADDRESS}::license::register_game`,
         type_arguments: [],
         functionArguments: [
-          MODULE_ADDRESS, // registry_addr
-          newGame.id,
-          Math.floor(parseFloat(newGame.price) * 1_000_000), // assuming price in APT
+          // newGame.id,     // game id
+          Math.floor(parseFloat(newGame.price) * 1_000_000), // rice (in APT)
           newGame.title,
           newGame.description,
           newGame.metadataUri,
@@ -220,7 +215,7 @@ export function DeveloperDashboard() {
       console.log('Transaction confirmed:', txn);
 
       alert("Game uploaded successfully!");
-      setNewGame({ id: "", price: "", title: "", description: "", metadataUri: "" });
+      setNewGame({ id: 0, price: "", title: "", description: "", metadataUri: "" });
       fetchGames();
     } catch (err) {
       console.error("Upload failed:", err);
@@ -248,14 +243,14 @@ export function DeveloperDashboard() {
                 <Plus size={18} /> Register New Game
               </h2>
               <form onSubmit={handleRegister} className="space-y-3">
-                <Input
+                {/* <Input
                   placeholder="Unique Game ID (e.g. 'cool_game_01')"
                   value={newGame.id}
                   onChange={(e) =>
                     setNewGame({ ...newGame, id: e.target.value })
                   }
                   required
-                />
+                /> */}
                 <Input
                   placeholder="Game Title"
                   value={newGame.title}

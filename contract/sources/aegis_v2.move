@@ -26,7 +26,7 @@ module aegis_addr::license {
     // License struct
     struct License has store, drop, copy {
         license_id: u64,
-        game_id: vector<u8>,
+        game_id: u64,
         owner: address,
         expiry: u64,
         transferable: bool,
@@ -35,13 +35,14 @@ module aegis_addr::license {
 
     // Game registry to store game prices
     struct GameRegistry has key {
-        games: Table<vector<u8>, GameInfo>,
-        dev_games: Table<address, vector<vector<u8>>>,  // maps developer → list of game_ids
-        all_game_ids: vector<vector<u8>>,
+        games: Table<u64, GameInfo>,
+        dev_games: Table<address, vector<u64>>,  // maps developer → list of game_ids
+        all_game_ids: vector<u64>,
+        next_game_id: u64,                      // auto-increment counter
     }
 
     struct GameInfo has store, drop, copy {
-        game_id: vector<u8>,
+        game_id: u64,
         price: u64,  // in Octas (1 APT = 100,000,000 Octas)
         title: vector<u8>,
         description: vector<u8>,
@@ -53,7 +54,7 @@ module aegis_addr::license {
     #[event]
     struct LicenseCreated has drop, store {
         license_id: u64,
-        game_id: vector<u8>,
+        game_id: u64,
         owner: address,
         expiry: u64,
         transferable: bool,
@@ -65,12 +66,12 @@ module aegis_addr::license {
         license_id: u64,
         from: address,
         to: address,
-        game_id: vector<u8>
+        game_id: u64
     }
 
     #[event]
     struct GameListed has drop, store {
-        game_id: vector<u8>,
+        game_id: u64,
         price: u64,
         title: vector<u8>,
         description: vector<u8>,
@@ -85,45 +86,12 @@ module aegis_addr::license {
         };
 
         let registry = GameRegistry {
-            games: table::new(),
-            dev_games: table::new(),
-            all_game_ids: vector::empty<vector<u8>>()
+            games: table::new<u64, GameInfo>(),
+            dev_games: table::new<address, vector<u64>>(),
+            all_game_ids: vector::empty<u64>(),
+            next_game_id: 0,
         };
         move_to(admin, registry);
-    }
-
-    // List a game for sale (called by game publisher/admin)
-    public entry fun list_game(
-        seller: &signer,
-        game_id: vector<u8>,
-        price: u64,
-        title: vector<u8>,
-        description: vector<u8>,
-        metadata_uri: vector<u8>
-    ) acquires GameRegistry {
-        let seller_addr = signer::address_of(seller);
-        let registry = borrow_global_mut<GameRegistry>(seller_addr);
-        
-        let game_info = GameInfo {
-            game_id,
-            price,
-            title,
-            description,
-            metadata_uri,
-            seller: seller_addr,
-            active: true
-        };
-        
-        // FIXED: Use the correct table and variables for GameRegistry
-        table::upsert(&mut registry.games, game_id, game_info);
-        
-        event::emit(GameListed {
-            game_id,
-            price,
-            title,
-            description,
-            seller: seller_addr
-        });
     }
     
     // Initialize license list for user
@@ -139,7 +107,7 @@ module aegis_addr::license {
     // Use this for mock games - no pre-listing needed!
     public entry fun buy_game_license(
         buyer: &signer,
-        game_id: vector<u8>,
+        game_id: u64,
         expiry: u64,
         transferable: bool,
         metadata_uri: vector<u8>
@@ -148,11 +116,7 @@ module aegis_addr::license {
         
         // Initialize if doesn't exist
         if (!exists<LicenseList>(buyer_address)) {
-            let license_holder = LicenseList {
-                licenses: table::new(),
-                license_counter: 0
-            };
-            move_to(buyer, license_holder);
+            create_list(buyer);
         };
 
         // Get the license list
@@ -190,8 +154,7 @@ module aegis_addr::license {
     // Use this later when you want real payments
     public entry fun buy_game_from_registry(
         buyer: &signer,
-        seller_addr: address,
-        game_id: vector<u8>
+        game_id: u64
     ) acquires LicenseList, GameRegistry {
         let buyer_address = signer::address_of(buyer);
         
@@ -201,30 +164,35 @@ module aegis_addr::license {
         };
 
         // Get game info
-        let registry = borrow_global<GameRegistry>(seller_addr);
+        let registry = borrow_global<GameRegistry>(@aegis_addr);
         assert!(table::contains(&registry.games, game_id), ENOT_FOUND);
+
         let game_info = table::borrow(&registry.games, game_id);
         assert!(game_info.active, ENOT_FOUND);
 
-        // Store values we need (important: do this before any mutable borrows)
+        // Store values we need
+        let seller_addr = game_info.seller;
         let price = game_info.price;
         let metadata_uri = game_info.metadata_uri;
+
+        // Check if already owned
+        assert!(!has_game_license(buyer_address, game_id), EALREADY_ISSUED);
 
         // Transfer payment from buyer to seller
         coin::transfer<AptosCoin>(buyer, seller_addr, price);
 
         // Get license list
         let license_list = borrow_global_mut<LicenseList>(buyer_address);
+        let counter = license_list.license_counter + 1;
         
         // Create new license
-        let counter = license_list.license_counter + 1;
         let new_license = License {
             license_id: counter,
             game_id,
             owner: buyer_address,
             expiry: 0,
             transferable: true,
-            metadata_uri: metadata_uri
+            metadata_uri
         };
         
         // Add to table
@@ -238,7 +206,7 @@ module aegis_addr::license {
             owner: buyer_address,
             expiry: 0,
             transferable: true,
-            metadata_uri: game_info.metadata_uri
+            metadata_uri
         });
     }
 
@@ -255,8 +223,8 @@ module aegis_addr::license {
         
         while (i <= license_list.license_counter) {
             if (table::contains(&license_list.licenses, i)) {
-                let license = *table::borrow(&license_list.licenses, i);
-                vector::push_back(&mut licenses, license);
+                let license = table::borrow(&license_list.licenses, i);
+                vector::push_back(&mut licenses, *license);
             };
             i = i + 1;
         };
@@ -266,7 +234,7 @@ module aegis_addr::license {
 
     // View function: Check if user owns a specific game
     #[view]
-    public fun has_game_license(owner: address, game_id: vector<u8>): bool acquires LicenseList {
+    public fun has_game_license(owner: address, game_id: u64): bool acquires LicenseList {
         if (!exists<LicenseList>(owner)) {
             return false
         };
@@ -306,12 +274,13 @@ module aegis_addr::license {
 
         let registry = borrow_global<GameRegistry>(@aegis_addr);
         let all_games = vector::empty<GameInfo>();
+        let all_game_ids = &registry.all_game_ids;
 
         let i = 0;
-        let len = vector::length(&registry.all_game_ids);
+        let len = vector::length(all_game_ids);
         
         while (i < len) {
-            let game_id = *vector::borrow(&registry.all_game_ids, i);
+            let game_id = *vector::borrow(all_game_ids, i);
             if (table::contains(&registry.games, game_id)) {
                 let game = table::borrow(&registry.games, game_id);
                 vector::push_back(&mut all_games, *game);
@@ -376,19 +345,20 @@ module aegis_addr::license {
     }
 
     public entry fun register_game(
-        publisher: &signer,
-        registry_addr: address,
-        game_id: vector<u8>,
+        seller: &signer,
         price: u64,
         title: vector<u8>,
         description: vector<u8>,
         metadata_uri: vector<u8>
     ) acquires GameRegistry {
-        let publisher_addr = signer::address_of(publisher);
-        
-        // Borrow the registry at the provided registry address
-        let registry = borrow_global_mut<GameRegistry>(registry_addr);
+        let seller_addr = signer::address_of(seller);
+        let registry = borrow_global_mut<GameRegistry>(@aegis_addr);
+
+        // Generate and increment game ID
+        let game_id = registry.next_game_id;
+        registry.next_game_id = game_id + 1;
        
+
         // Create game info
         let game_info = GameInfo {
             game_id,
@@ -396,23 +366,28 @@ module aegis_addr::license {
             title,
             description,
             metadata_uri,
-            seller: publisher_addr,
+            seller: seller_addr,
             active: true
         };
         
         // Add to game table
         table::upsert(&mut registry.games, game_id, game_info);
         
-        // Add game_id to all_game_ids vector
-        vector::push_back(&mut registry.all_game_ids, game_id);
-
-        // Add game_id to developer’s list (dev_games)
-        if (!table::contains(&registry.dev_games, publisher_addr)) {
-            table::add(&mut registry.dev_games, publisher_addr, vector::empty<vector<u8>>());
+        // Add to all_game_ids 
+        if (!vector::contains(&registry.all_game_ids, &game_id)) {
+            vector::push_back(&mut registry.all_game_ids, game_id);
         };
 
-        let dev_list = table::borrow_mut(&mut registry.dev_games, publisher_addr);
-        vector::push_back(dev_list, game_id);
+        // Initialize developer's list if needed
+        if (!table::contains(&registry.dev_games, seller_addr)) {
+            table::add(&mut registry.dev_games, seller_addr, vector::empty<u64>());
+        };
+
+        // Add in developer's list
+        let dev_list = table::borrow_mut(&mut registry.dev_games, seller_addr);
+        if (!vector::contains(dev_list, &game_id)) {
+            vector::push_back(dev_list, game_id);
+        };
         
         // Emit event
         event::emit(GameListed {
@@ -420,7 +395,7 @@ module aegis_addr::license {
             price,
             title,
             description,
-            seller: publisher_addr
+            seller: seller_addr
         });
     }
 }

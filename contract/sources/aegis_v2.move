@@ -158,34 +158,54 @@ module aegis_addr::license {
     ) acquires LicenseList, GameRegistry {
         let buyer_address = signer::address_of(buyer);
         
+        // Debug: Print buyer address
+        std::debug::print(&buyer_address);
+
         // Ensure buyer has initialized their license list
         if (!exists<LicenseList>(buyer_address)) {
+            std::debug::print(&std::string::utf8(b"Creating license list"));
             create_list(buyer);
         };
 
+        // Check GameRegistry exists
+        std::debug::print(&std::string::utf8(b"Checking registry exists"));
+        assert!(is_registry_initialized(), ENOT_FOUND);
+
         // Get game info
+         std::debug::print(&std::string::utf8(b"Borrowing registry"));
         let registry = borrow_global<GameRegistry>(@aegis_addr);
+
+
+        std::debug::print(&std::string::utf8(b"Checking game_id in table"));
         assert!(table::contains(&registry.games, game_id), ENOT_FOUND);
 
+        std::debug::print(&std::string::utf8(b"Borrowing game_info"));
         let game_info = table::borrow(&registry.games, game_id);
+
+
+        std::debug::print(&game_info.active);
         assert!(game_info.active, ENOT_FOUND);
 
-        // Store values we need
+        // Store values we need BEFORE any mutations
         let seller_addr = game_info.seller;
         let price = game_info.price;
         let metadata_uri = game_info.metadata_uri;
 
         // Check if already owned
+        std::debug::print(&std::string::utf8(b"Check if already owned"));
         assert!(!has_game_license(buyer_address, game_id), EALREADY_ISSUED);
 
         // Transfer payment from buyer to seller
+        std::debug::print(&std::string::utf8(b"Transfering payment"));
         coin::transfer<AptosCoin>(buyer, seller_addr, price);
 
         // Get license list
+        std::debug::print(&std::string::utf8(b"Get license list"));
         let license_list = borrow_global_mut<LicenseList>(buyer_address);
         let counter = license_list.license_counter + 1;
         
         // Create new license
+        std::debug::print(&std::string::utf8(b"Create new license"));
         let new_license = License {
             license_id: counter,
             game_id,
@@ -196,10 +216,12 @@ module aegis_addr::license {
         };
         
         // Add to table
+        std::debug::print(&std::string::utf8(b"Add to table"));
         table::add(&mut license_list.licenses, counter, new_license);
         license_list.license_counter = counter;
         
         // Emit event
+        std::debug::print(&std::string::utf8(b"Emit event"));
         event::emit(LicenseCreated {
             license_id: counter,
             game_id,
@@ -230,6 +252,78 @@ module aegis_addr::license {
         };
         
         licenses
+    }
+
+    // Struct to hold license with game details
+    struct LicenseWithGameInfo has drop, copy {
+        license_id: u64,
+        game_id: u64,
+        owner: address,
+        expiry: u64,
+        transferable: bool,
+        metadata_uri: vector<u8>,
+        // Game details
+        game_title: vector<u8>,
+        game_description: vector<u8>,
+        game_price: u64,
+        game_seller: address,
+        game_active: bool
+    }
+
+    // View function: Get all licenses with game details for an account
+    #[view]
+    public fun get_user_licenses_with_games(owner: address): vector<LicenseWithGameInfo> acquires LicenseList, GameRegistry {
+        if (!exists<LicenseList>(owner)) {
+            return vector::empty<LicenseWithGameInfo>()
+        };
+        
+        let license_list = borrow_global<LicenseList>(owner);
+        let licenses_with_games = vector::empty<LicenseWithGameInfo>();
+        
+        // Check if registry exists
+        let has_registry = exists<GameRegistry>(@aegis_addr);
+        
+        let i = 1;
+        while (i <= license_list.license_counter) {
+            if (table::contains(&license_list.licenses, i)) {
+                let license = table::borrow(&license_list.licenses, i);
+                
+                // Get game details if registry exists and game is found
+                let (game_title, game_description, game_price, game_seller, game_active) = 
+                    if (has_registry) {
+                        let registry = borrow_global<GameRegistry>(@aegis_addr);
+                        if (table::contains(&registry.games, license.game_id)) {
+                            let game_info = table::borrow(&registry.games, license.game_id);
+                            (game_info.title, game_info.description, game_info.price, game_info.seller, game_info.active)
+                        } else {
+                            // Game not found in registry
+                            (b"Unknown Game", b"Game details not available", 0, @0x0, false)
+                        }
+                    } else {
+                        // Registry doesn't exist
+                        (b"Unknown Game", b"Registry not initialized", 0, @0x0, false)
+                    };
+                
+                let license_with_game = LicenseWithGameInfo {
+                    license_id: license.license_id,
+                    game_id: license.game_id,
+                    owner: license.owner,
+                    expiry: license.expiry,
+                    transferable: license.transferable,
+                    metadata_uri: license.metadata_uri,
+                    game_title,
+                    game_description,
+                    game_price,
+                    game_seller,
+                    game_active
+                };
+                
+                vector::push_back(&mut licenses_with_games, license_with_game);
+            };
+            i = i + 1;
+        };
+        
+        licenses_with_games
     }
 
     // View function: Check if user owns a specific game

@@ -39,13 +39,13 @@ export function Header() {
                 </Button>
               </Link>
               
-              <Link to="/launcher">
+              {/* <Link to="/launcher">
                 <Button 
                   variant={location.pathname === "/launcher" ? "default" : "ghost"}
                 >
                   Launcher
                 </Button>
-              </Link>
+              </Link> */}
 
               {user && user.role === "developer" && (
                 <Link to="/dev-dashboard">

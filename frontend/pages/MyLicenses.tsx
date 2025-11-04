@@ -288,7 +288,7 @@ export function MyLicenses() {
                       </span>
                     </div>
                     
-                    {license.expiry !== '0' && (
+                    {/* {license.expiry !== '0' && (
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground flex items-center gap-1">
                           ⏰ Expires:
@@ -297,7 +297,7 @@ export function MyLicenses() {
                           {new Date(parseInt(license.expiry) * 1000).toLocaleDateString()}
                         </span>
                       </div>
-                    )}
+                    )} */}
                     
                     <div className="flex items-center justify-between pt-2 border-t border-border/50">
                       <span className="text-muted-foreground flex items-center gap-1">

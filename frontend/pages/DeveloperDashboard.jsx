@@ -216,7 +216,7 @@ export function DeveloperDashboard() {
           myGames.push({
             title: hexToString(game.title),
             description: hexToString(game.description),
-            metadataUri: hexToString(game.metadata_uri),
+            metadataUri: hexToString(game.metadata_uri).replace("gateway.pinata.cloud", PINATA_GATEWAY),
             price: game.price / 1_000_000,
           });
         } catch (e) {

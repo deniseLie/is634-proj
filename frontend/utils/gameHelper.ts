@@ -63,11 +63,13 @@ export function generateRandomGame(
 
   const { game_id, title, description, metadataUri, seller, price } = game;
 
+  let updatedMetadataUri  = metadataUri.replace("gateway.pinata.cloud", import.meta.env.VITE_PINATA_GATEWAY);
+
   return {
     id: game_id,
     title,
     description,
-    shortDescription: `Short description for ${title}`,
+    shortDescription: description,
     genre: getRandomArray(genres, 1, 3),
     developer: `Dev Studio ${getRandomInt(1, 100)}`,
     publisher: `Publisher ${getRandomInt(1, 100)}`,
@@ -75,8 +77,8 @@ export function generateRandomGame(
     price: price / 1_000_000, // Random price between 0 and 10
     // coverImage: screenshotUrls[getRandomInt(0, screenshotUrls.length - 1)],
     // screenshots: getRandomArray(screenshotUrls, 2, 3),
-    coverImage: [metadataUri],
-    screenshots: [metadataUri],
+    coverImage: [updatedMetadataUri ],
+    screenshots: [updatedMetadataUri ],
     rating: parseFloat((Math.random() * 2 + 3).toFixed(1)), // Random rating 3.0 - 5.0
     reviewCount: getRandomInt(100, 20000),
     features: getRandomArray(featuresPool, 2, 5),

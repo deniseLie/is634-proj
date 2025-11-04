@@ -19,7 +19,7 @@ const MODULE_ADDRESS =
 const PINATA_API_KEY = import.meta.env.VITE_PINATA_API_KEY || "YOUR_PINATA_API_KEY";
 const PINATA_SECRET_KEY = import.meta.env.VITE_PINATA_SECRET_KEY || "YOUR_PINATA_SECRET_KEY";
 const PINATA_JWT = import.meta.env.VITE_PINATA_JWT || "YOUR_PINATA_JWT";
-const PINATA_GATEWAY = import.meta.env.VITE_GATEWAY_NAME || "gateway.pinata.cloud";
+const PINATA_GATEWAY = import.meta.env.VITE_PINATA_GATEWAY || "gateway.pinata.cloud";
 
 // ------------------ HELPER ------------------
 const arrayToString = (arr) => {

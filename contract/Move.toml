@@ -10,3 +10,6 @@ aegis_addr = "_"
 AptosFramework = { git = "https://github.com/aptos-labs/aptos-framework.git", rev = "mainnet", subdir = "aptos-framework" }
 
 [dev-dependencies]
+
+[dev-addresses]
+aegis_addr = "0x123"  # Your test address

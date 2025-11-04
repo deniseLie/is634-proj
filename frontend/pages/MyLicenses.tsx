@@ -17,6 +17,7 @@ const config = new AptosConfig({ network: Network.DEVNET });
 const aptos = new Aptos(config);
 
 const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS || "0xc5d8f29f688c22ced2b33ba05d7d5241a21ece238ad1657e922251995b059ebc";
+const VITE_PINATA_GATEWAY = import.meta.env.VITE_PINATA_GATEWAY || "gateway.pinata.cloud";
 
 // Type definitions for on-chain data
 interface LicenseWithGameInfo {
@@ -35,17 +36,18 @@ interface LicenseWithGameInfo {
 
 // Helper to parse license data
 const parseLicense = (license: LicenseWithGameInfo): LicenseWithGameInfo => {
+  
   return {
     license_id: parseInt(license.license_id),
     game_id: parseInt(license.game_id),
-    owner: hexToString(license.owner),
+    owner: license.owner,
     expiry: parseInt(license.expiry),
     transferable: license.transferable,
-    metadata_uri: hexToString(license.metadata_uri),
+    metadata_uri: hexToString(license.metadata_uri).replace("gateway.pinata.cloud", VITE_PINATA_GATEWAY),
     game_title: hexToString(license.game_title),
     game_description: hexToString(license.game_description),
     game_price: license.game_price / 1_000_000_000,
-    game_seller: hexToString(license.game_seller),
+    game_seller: license.game_seller,
     game_active: license.game_active
   };
 };

@@ -6,8 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Package, Plus } from "lucide-react";
-import { title } from "process";
+import { Loader2, Package, Plus, Upload, Image as ImageIcon } from "lucide-react";
 
 // ------------------ APTOS SETUP ------------------
 const config = new AptosConfig({ network: Network.DEVNET });
@@ -15,6 +14,12 @@ const aptos = new Aptos(config);
 const MODULE_ADDRESS =
   import.meta.env.VITE_MODULE_ADDRESS ||
   "0xc5d8f29f688c22ced2b33ba05d7d5241a21ece238ad1657e922251995b059ebc";
+
+// ------------------ PINATA CONFIG ------------------
+const PINATA_API_KEY = import.meta.env.VITE_PINATA_API_KEY || "YOUR_PINATA_API_KEY";
+const PINATA_SECRET_KEY = import.meta.env.VITE_PINATA_SECRET_KEY || "YOUR_PINATA_SECRET_KEY";
+const PINATA_JWT = import.meta.env.VITE_PINATA_JWT || "YOUR_PINATA_JWT";
+const PINATA_GATEWAY = import.meta.env.VITE_GATEWAY_NAME || "gateway.pinata.cloud";
 
 // ------------------ HELPER ------------------
 const arrayToString = (arr) => {
@@ -41,12 +46,53 @@ function hexToString(hex) {
   return str;
 }
 
+// ------------------ PINATA UPLOAD ------------------
+const uploadToPinata = async (file) => {
+  try {
+    const formData = new FormData();
+
+    // Build form data
+    formData.append('file', file); 
+    formData.append("pinataMetadata", JSON.stringify({ name: file.name }));
+    formData.append("pinataOptions", JSON.stringify({ cidVersion: 1 }));
+
+    // Use JWT authentication (recommended)
+    const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${PINATA_JWT}`,
+      },
+      body: formData,
+    });
+    console.log("Response from Pinata:", response);
+
+    if (!response.ok) {
+      throw new Error(`Pinata upload failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('data from Pinata:', data);
+
+    const ipfsUrl = `https://${PINATA_GATEWAY}/ipfs/${data.IpfsHash}`;
+    
+    return {
+      ipfsHash: data.IpfsHash,
+      ipfsUrl: ipfsUrl,
+    };
+  } catch (error) {
+    console.error('Pinata upload error:', error);
+    throw error;
+  }
+};
+
 // ------------------ COMPONENT ------------------
 export function DeveloperDashboard() {
   const { account, connected, signAndSubmitTransaction } = useWallet();
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
 
   const [newGame, setNewGame] = useState({
     price: "",
@@ -54,6 +100,11 @@ export function DeveloperDashboard() {
     description: "",
     metadataUri: "",
   });
+
+  useEffect(() => {
+    fetchGames();
+  }, [account?.address]);
+
 
   // ------------------ FETCH GAMES ------------------
   const fetchGames = async () => {
@@ -181,9 +232,47 @@ export function DeveloperDashboard() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchGames();
-  }, [account?.address]);
+  // ------------------ IMAGE UPLOAD ------------------
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size must be less than 10MB');
+      return;
+    }
+
+    try {
+      setImageUploading(true);
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+
+      // Upload to Pinata
+      const result = await uploadToPinata(file);
+      
+      // Set the IPFS URL as metadata URI
+      setNewGame({ ...newGame, metadataUri: result.ipfsUrl });
+      
+      alert(`Image uploaded successfully! IPFS Hash: ${result.ipfsHash}`);
+    } catch (error) {
+      console.error('Image upload failed:', error);
+      alert('Failed to upload image to IPFS. Please check your Pinata credentials.');
+    } finally {
+      setImageUploading(false);
+    }
+  };
 
   // ------------------ REGISTER GAME ------------------
   const handleRegister = async (e) => {
@@ -216,6 +305,7 @@ export function DeveloperDashboard() {
 
       alert("Game uploaded successfully!");
       setNewGame({ id: 0, price: "", title: "", description: "", metadataUri: "" });
+      setImagePreview(null);
       fetchGames();
     } catch (err) {
       console.error("Upload failed:", err);
@@ -252,34 +342,85 @@ export function DeveloperDashboard() {
                   required
                 /> */}
                 <Input
-                  placeholder="Game Title"
+                  placeholder="Game Title*"
                   value={newGame.title}
                   onChange={(e) =>
                     setNewGame({ ...newGame, title: e.target.value })
                   }
                 />
                 <Input
-                  placeholder="Description"
+                  placeholder="Description*"
                   value={newGame.description}
                   onChange={(e) =>
                     setNewGame({ ...newGame, description: e.target.value })
                   }
                 />
+{/* 
                 <Input
-                  placeholder="Metadata URI (IPFS / CDN link)"
+                  placeholder="Metadata URI (IPFS link)"
                   value={newGame.metadataUri}
                   onChange={(e) =>
                     setNewGame({ ...newGame, metadataUri: e.target.value })
                   }
-                />
+                /> */}
                 <Input
-                  placeholder="Price in APT"
+                  placeholder="Price in APT*"
                   type="number"
                   value={newGame.price}
                   onChange={(e) =>
                     setNewGame({ ...newGame, price: e.target.value })
                   }
                 />
+
+                {/* Image Upload */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Game Cover Image
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById('image-upload').click()}
+                      disabled={imageUploading}
+                      className="w-full"
+                    >
+                      {imageUploading ? (
+                        <>
+                          <Loader2 className="animate-spin mr-2" size={18} />
+                          Uploading to IPFS...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="mr-2" size={18} />
+                          Upload Image to Pinata
+                        </>
+                      )}
+                    </Button>
+                    <input
+                      id="image-upload"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                  </div>
+                  
+                  {imagePreview && (
+                    <div className="mt-2 relative">
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="w-full h-48 object-cover rounded-lg border"
+                      />
+                      <Badge className="absolute top-2 right-2 bg-green-500">
+                        Uploaded to IPFS
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+
+                {/* SUBMIT */}
                 <Button type="submit" disabled={uploading}>
                   {uploading && <Loader2 className="animate-spin mr-2" />}
                   Upload Game
@@ -305,18 +446,38 @@ export function DeveloperDashboard() {
                       key={g.id}
                       className="flex justify-between items-center border rounded-lg p-3 hover:bg-muted/40 transition"
                     >
-                      <div>
+                      {/* Cover image */}
+                      {g.metadataUri && (
+                        <img
+                          src={g.metadataUri}
+                          alt={g.title}
+                          className="w-24 h-24 object-cover rounded-lg"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      )}
+                      <div className="flex-1">
                         <h3 className="font-medium">{g.title}</h3>
                         <p className="text-sm text-gray-600">
                           {g.description}
                         </p>
-                        <Badge className="mt-1">
-                          {g.price} APT
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge className="mt-1">
+                            {g.price} APT
+                          </Badge>
+                          {g.metadataUri && (
+                            <a
+                              href={g.metadataUri}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:underline"
+                            >
+                              View on IPFS
+                            </a>
+                          )}
+                        </div>
                       </div>
-                      {/* <Button variant="outline" size="sm">
-                        View Details
-                      </Button> */}
                     </div>
                   ))}
                 </div>

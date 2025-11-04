@@ -73,8 +73,10 @@ export function generateRandomGame(
     publisher: `Publisher ${getRandomInt(1, 100)}`,
     releaseDate: `2024-${getRandomInt(1, 12).toString().padStart(2, "0")}-${getRandomInt(1, 28).toString().padStart(2, "0")}`,
     price: price / 1_000_000, // Random price between 0 and 10
-    coverImage: screenshotUrls[getRandomInt(0, screenshotUrls.length - 1)],
-    screenshots: getRandomArray(screenshotUrls, 2, 3),
+    // coverImage: screenshotUrls[getRandomInt(0, screenshotUrls.length - 1)],
+    // screenshots: getRandomArray(screenshotUrls, 2, 3),
+    coverImage: [metadataUri],
+    screenshots: [metadataUri],
     rating: parseFloat((Math.random() * 2 + 3).toFixed(1)), // Random rating 3.0 - 5.0
     reviewCount: getRandomInt(100, 20000),
     features: getRandomArray(featuresPool, 2, 5),

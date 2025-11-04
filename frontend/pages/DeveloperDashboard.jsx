@@ -431,49 +431,72 @@ export function DeveloperDashboard() {
 
           {/* Game List */}
           <Card>
-            <CardContent className="p-4">
-              <h2 className="text-lg font-semibold mb-4">My Games</h2>
+            <CardContent className="p-6">
+              <h2 className="text-2xl font-bold mb-6">My Games</h2>
               {loading ? (
-                <div className="flex justify-center p-4">
-                  <Loader2 className="animate-spin" />
+                <div className="flex justify-center p-8">
+                  <Loader2 className="animate-spin h-8 w-8 text-primary" />
                 </div>
               ) : games.length === 0 ? (
-                <p className="text-gray-500">No games uploaded yet.</p>
+                <div className="text-center py-12">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+                    <svg className="w-8 h-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                    </svg>
+                  </div>
+                  <p className="text-muted-foreground text-lg">No games uploaded yet</p>
+                  <p className="text-sm text-muted-foreground mt-1">Upload your first game to get started</p>
+                </div>
               ) : (
-                <div className="grid gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {games.map((g) => (
                     <div
                       key={g.id}
-                      className="flex justify-between items-center border rounded-lg p-3 hover:bg-muted/40 transition"
+                      className="group relative overflow-hidden rounded-xl border bg-card hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
                     >
                       {/* Cover image */}
-                      {g.metadataUri && (
-                        <img
-                          src={g.metadataUri}
-                          alt={g.title}
-                          className="w-24 h-24 object-cover rounded-lg"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                      )}
-                      <div className="flex-1">
-                        <h3 className="font-medium">{g.title}</h3>
-                        <p className="text-sm text-gray-600">
+                      <div className="relative aspect-video w-full overflow-hidden bg-muted">
+                        {g.metadataUri ? (
+                          <img
+                            src={g.metadataUri}
+                            alt={g.title}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            onError={(e) => {
+                              e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="225" viewBox="0 0 400 225"%3E%3Crect fill="%23f1f5f9" width="400" height="225"/%3E%3Ctext fill="%2394a3b8" font-family="sans-serif" font-size="24" dy="10.5" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3ENo Image%3C/text%3E%3C/svg%3E';
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <svg className="w-12 h-12 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Content */}
+                      <div className="p-4">
+                        <h3 className="font-semibold text-lg mb-2 line-clamp-1">{g.title}</h3>
+                        <p className="text-sm text-muted-foreground mb-4 line-clamp-2 min-h-[2.5rem]">
                           {g.description}
                         </p>
-                        <div className="flex items-center gap-2">
-                          <Badge className="mt-1">
+                        
+                        {/* Footer */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl font-bold">
                             {g.price} APT
-                          </Badge>
+                          </span>
                           {g.metadataUri && (
                             <a
                               href={g.metadataUri}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-xs text-blue-600 hover:underline"
+                              className="text-xs text-primary hover:underline flex items-center gap-1"
                             >
-                              View on IPFS
+                              <span>View IPFS</span>
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
                             </a>
                           )}
                         </div>

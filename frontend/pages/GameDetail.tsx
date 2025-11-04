@@ -277,7 +277,7 @@ export function GameDetail() {
               </div>
 
               {/* Thumbnails */}
-              <div className="grid grid-cols-4 gap-2 p-4">
+              {/* <div className="grid grid-cols-4 gap-2 p-4">
                 {allImages.map((image, index) => (
                   <button
                     key={index}
@@ -295,7 +295,7 @@ export function GameDetail() {
                     />
                   </button>
                 ))}
-              </div>
+              </div> */}
             </CardContent>
           </Card>
 
